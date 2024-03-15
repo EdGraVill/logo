@@ -1,0 +1,17 @@
+{
+  "name": "logo",
+  "scripts": {
+    "start": "parcel index.html index.ts"
+  },
+  "eslintConfig": {
+    "extends": "@apptoolkit"
+  },
+  "devDependencies": {
+    "@apptoolkit/eslint-config": "^0.3.0",
+    "@types/bun": "latest",
+    "parcel": "^2.12.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
