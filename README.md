@@ -1,15 +1,24 @@
 # logo
 
-To install dependencies:
+<style>
+@media (prefers-color-scheme: light) {
+  .light {
+    display: block;
+  }
+  .dark {
+    display: none;
+  }
+}
 
-```bash
-bun install
-```
+@media (prefers-color-scheme: dark) {
+  .light {
+    display: none;
+  }
+  .dark {
+    display: block;
+  }
+}
+</style>
 
-To run:
-
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.0.26. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+<div class="light">Light</div>
+<div class="dark">Dark</div>
