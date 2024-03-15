@@ -20,5 +20,9 @@
 }
 </style>
 
-<div class="light">Light</div>
-<div class="dark">Dark</div>
+<div class="light">
+  ![logo](https://github.com/EdGraVill/logo/assets/16921957/bf780ec5-a081-4368-a317-2bbbe910f97d)
+</div>
+<div class="dark">
+  ![logo](https://github.com/EdGraVill/logo/assets/16921957/09496d7c-ccdd-4548-a31e-bbccad1e636b)
+</div>
