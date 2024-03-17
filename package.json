@@ -1,7 +1,7 @@
 {
   "name": "logo",
   "scripts": {
-    "start": "parcel index.html index.ts"
+    "start": "parcel index.html"
   },
   "eslintConfig": {
     "extends": "@apptoolkit"

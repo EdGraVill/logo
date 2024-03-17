@@ -1,18 +1,23 @@
-type Coord = [x: number, y: number];
-type Line = [start: Coord, end: Coord];
+import { Position, type Coord, type Line } from './types';
+import {
+  getCenterOfLine,
+  getPerpendicularCoordOfCenter,
+  getTwoLinesIntersection,
+  moveRelative,
+  subtractCoords,
+} from './utils';
 
-const RATIO = 2000;
-const UNIT = RATIO / 14;
+import { RATIO, UNIT } from './constants';
 
 const u = (num: number) => UNIT * num;
 
-interface LineStyle {
+interface CtxStyle {
   lineCap: CanvasLineCap;
   lineWidth: number;
   strokeStyle: string;
 }
 
-const styleLine = (ctx: CanvasRenderingContext2D, style?: Partial<LineStyle>): CanvasRenderingContext2D => {
+const styleCtx = (ctx: CanvasRenderingContext2D, style?: Partial<CtxStyle>): CanvasRenderingContext2D => {
   Object.entries(style ?? {}).forEach(([key, value]) => {
     Reflect.set(ctx, key, value);
   });
@@ -20,7 +25,7 @@ const styleLine = (ctx: CanvasRenderingContext2D, style?: Partial<LineStyle>): C
   return ctx;
 };
 
-const drawLineOverDots = (ctx: CanvasRenderingContext2D, ...coors: Coord[]) => {
+const drawLine = (ctx: CanvasRenderingContext2D, ...coors: Coord[]) => {
   ctx.beginPath();
 
   const [[x, y], ...rest] = coors;
@@ -33,67 +38,26 @@ const drawLineOverDots = (ctx: CanvasRenderingContext2D, ...coors: Coord[]) => {
 
   ctx.stroke();
   ctx.closePath();
-
-  return coors[coors.length - 1];
 };
 
-const getCenterOfLine = ([[x1, y1], [x2, y2]]: Line): Coord => [(x1 + x2) / 2, (y1 + y2) / 2];
-
-const getTwoLinesIntersection = ([[l1x1, l1y1], [l1x2, l1y2]]: Line, [[l2x1, l2y1], [l2x2, l2y2]]: Line): Coord => {
-  const ml1 = l1x2 - l1x1 !== 0 ? (l1y2 - l1y1) / (l1x2 - l1x1) : null;
-  const ml2 = l2x2 - l2x1 !== 0 ? (l2y2 - l2y1) / (l2x2 - l2x1) : null;
-
-  if (!ml1 && ml2) {
-    return [l1x1, ml2 * l1x1 + l2y1 - ml2 * l2x1];
+const drawCloseShape = (ctx: CanvasRenderingContext2D, ...coors: Coord[]) => {
+  if (coors.length < 3) {
+    throw new Error('A shape must have at least 3 points');
   }
 
-  if (ml1 && !ml2) {
-    return [l2x1, ml1 * l2x1 + l1y1 - ml1 * l1x1];
+  const [first, ...rest] = coors;
+  const last = coors.pop() as Coord;
+
+  const shape = [first, ...rest, last];
+
+  if (first[0] === last[0] && first[1] === last[1]) {
+    shape.push(rest[0]);
+  } else {
+    shape.push(first, rest[0]);
   }
 
-  if (ml1 && ml2) {
-    const bl1 = l1y1 - ml1 * l1x1;
-    const bl2 = l2y1 - ml2 * l2x1;
-
-    const x = (bl2 - bl1) / (ml1 - ml2);
-    const y = ml1 * x + bl1;
-
-    return [x, y];
-  }
-
-  throw new Error('Lines are parallel');
+  drawLine(ctx, ...shape);
 };
-
-const translate =
-  (...cords: Coord[]) =>
-  ([dx, dy]: Coord): Coord[] =>
-    cords.map(([x, y]) => [x + dx, y + dy]);
-
-const getPerpendicularCenterCoord = ([[x1, y1], [x2, y2]]: Line, distance: number): Coord => {
-  const m = (y2 - y1) / (x2 - x1);
-  const m2 = -1 / m;
-
-  const x = (x1 + x2) / 2;
-  const y = (y1 + y2) / 2;
-
-  const x3 = x + Math.sqrt(distance ** 2 / (1 + m2 ** 2));
-  const y3 = y + m2 * (x3 - x);
-
-  return [x3, y3];
-};
-
-const subtractCoords = ([x1, y1]: Coord, [x2, y2]: Coord): Coord => [x1 - x2, y1 - y2];
-
-enum Position {
-  bottom = 'bottom',
-  bottomLeft = 'bottomLeft',
-  bottomRight = 'bottomRight',
-  left = 'left',
-  right = 'right',
-  top = 'top',
-  topLeft = 'topLeft',
-  topRight = 'topRight',
-}
 
 const drawText = (ctx: CanvasRenderingContext2D, center: Coord, text: string, position = Position.topRight) => {
   const [x, y] = center;
@@ -133,7 +97,27 @@ const drawText = (ctx: CanvasRenderingContext2D, center: Coord, text: string, po
   }
 };
 
-function draw(separation = 0.5) {
+const drawGrid = (ctx: CanvasRenderingContext2D) => {
+  Array.from({ length: 15 }).forEach((_, i) => {
+    if (ctx) {
+      ctx = styleCtx(ctx, {
+        lineWidth: UNIT * 0.015,
+        strokeStyle: 'lightgray',
+      });
+
+      drawLine(ctx, [i, 0], [i, 14]);
+      drawLine(ctx, [0, i], [14, i]);
+
+      ctx.fillStyle = 'lightgray';
+      ctx.font = `${UNIT * 0.15}px sans-serif`;
+      Array.from({ length: 15 }).forEach((_, j) => {
+        ctx?.fillText(`${i}, ${j}`, u(i) + UNIT * 0.05, u(j) + UNIT * 0.15);
+      });
+    }
+  });
+};
+
+export default function drawCanvas(separation = 0) {
   const canvas = document.getElementById('canvas') as HTMLCanvasElement | null;
 
   if (canvas) {
@@ -143,7 +127,7 @@ function draw(separation = 0.5) {
     let ctx = canvas.getContext('2d');
 
     if (ctx) {
-      ctx = styleLine(ctx, {
+      ctx = styleCtx(ctx, {
         lineWidth: UNIT * 0.33,
         strokeStyle: 'black',
       });
@@ -167,61 +151,41 @@ function draw(separation = 0.5) {
         [[8, 13], trisection],
       );
 
-      drawLineOverDots(ctx, ...translate([7, 1], aRight, trisection, aLeft, [7, 1], aRight)([0, -separation]));
+      drawCloseShape(ctx, ...moveRelative([7, 1], aRight, trisection, aLeft)([0, -separation]));
 
-      drawLineOverDots(
+      drawCloseShape(
         ctx,
-        ...translate(
+        ...moveRelative(
           aRight,
           [12, 9],
           [10, 13],
           [6, 13],
           trisection,
-          aRight,
-          [12, 9],
         )(
           subtractCoords(
-            getPerpendicularCenterCoord([trisection, aRight], separation),
+            getPerpendicularCoordOfCenter([trisection, aRight], separation),
             getCenterOfLine([trisection, aRight]),
           ),
         ),
       );
 
-      drawLineOverDots(
+      drawCloseShape(
         ctx,
-        ...translate(
+        ...moveRelative(
           aLeft,
           trisection,
           [6, 13],
           [4, 13],
           [2, 9],
-          aLeft,
-          trisection,
         )(
           subtractCoords(
             getCenterOfLine([aLeft, trisection]),
-            getPerpendicularCenterCoord([aLeft, trisection], -separation),
+            getPerpendicularCoordOfCenter([aLeft, trisection], -separation),
           ),
         ),
       );
 
-      Array.from({ length: 15 }).forEach((_, i) => {
-        if (ctx) {
-          ctx = styleLine(ctx, {
-            lineWidth: UNIT * 0.015,
-            strokeStyle: 'gray',
-          });
-
-          drawLineOverDots(ctx, [i, 0], [i, 14]);
-          drawLineOverDots(ctx, [0, i], [14, i]);
-
-          ctx.fillStyle = 'gray';
-          ctx.font = `${UNIT * 0.15}px sans-serif`;
-          Array.from({ length: 15 }).forEach((_, j) => {
-            ctx?.fillText(`${i}, ${j}`, u(i) + UNIT * 0.05, u(j) + UNIT * 0.15);
-          });
-        }
-      });
+      drawGrid(ctx);
 
       ctx.fillStyle = 'black';
       const A: Coord = [7, 1];
@@ -242,7 +206,7 @@ function draw(separation = 0.5) {
       ctx.setLineDash([u(0.1)]);
 
       ctx.fillStyle = 'blue';
-      ctx = styleLine(ctx, {
+      ctx = styleCtx(ctx, {
         lineWidth: UNIT * 0.06,
         strokeStyle: 'blue',
       });
@@ -253,10 +217,10 @@ function draw(separation = 0.5) {
 
       const χ: Line = [α, D];
       drawText(ctx, getCenterOfLine(χ), 'χ = αD', Position.bottomRight);
-      drawLineOverDots(ctx, ...χ);
+      drawLine(ctx, ...χ);
 
       ctx.fillStyle = 'green';
-      ctx = styleLine(ctx, {
+      ctx = styleCtx(ctx, {
         strokeStyle: 'green',
       });
 
@@ -266,10 +230,10 @@ function draw(separation = 0.5) {
       const AE: Line = [A, E];
       const ψ: Line = [β, getTwoLinesIntersection(AE, [β, [6, 0]])];
       drawText(ctx, getCenterOfLine(ψ), 'ψ = β - AE', Position.top);
-      drawLineOverDots(ctx, ...ψ);
+      drawLine(ctx, ...ψ);
 
       ctx.fillStyle = 'red';
-      ctx = styleLine(ctx, {
+      ctx = styleCtx(ctx, {
         strokeStyle: 'red',
       });
 
@@ -278,7 +242,7 @@ function draw(separation = 0.5) {
 
       const ω: Line = [γ, getTwoLinesIntersection(χ, ψ)];
       drawText(ctx, getCenterOfLine(ω), 'ω = γ - (χ,ψ) - AE', Position.right);
-      drawLineOverDots(ctx, ...ω, getTwoLinesIntersection(AE, ω));
+      drawLine(ctx, ...ω, getTwoLinesIntersection(AE, ω));
 
       ctx.fillStyle = 'orange';
 
@@ -288,5 +252,3 @@ function draw(separation = 0.5) {
     }
   }
 }
-
-draw(0);
