@@ -3,43 +3,6 @@ import { GRID_SIZE } from './constants';
 import { A, B, C, D, E, leftSector, rightSector, topSector, α, αD, β, γ, χ, ψ, ω, Θ } from './shape';
 import { getCenterOfLine } from './utils';
 
-interface SVGStyle {
-  fill: string;
-  fillOpacity: number;
-  fillRule: 'nonzero' | 'evenodd';
-  strokeColor: string;
-  strokeDasharray: string;
-  strokeDashoffset: string;
-  strokeLinecap: 'butt' | 'round' | 'square';
-  strokeLinejoin: 'arcs' | 'bevel' | 'miter' | 'miter-clip' | 'round';
-  strokeMiterlimit: number;
-  strokeOpacity: number;
-  strokeWidth: number;
-}
-
-const mapStyleWithAttribute: Record<keyof SVGStyle, string> = {
-  fill: 'fill',
-  fillOpacity: 'fill-opacity',
-  fillRule: 'fill-rule',
-  strokeColor: 'stroke',
-  strokeDasharray: 'stroke-dasharray',
-  strokeDashoffset: 'stroke-dashoffset',
-  strokeLinecap: 'stroke-linecap',
-  strokeLinejoin: 'stroke-linejoin',
-  strokeMiterlimit: 'stroke-miterlimit',
-  strokeOpacity: 'stroke-opacity',
-  strokeWidth: 'stroke-width',
-};
-
-const styleSVG = <SVGEl extends SVGElement>(svg: SVGEl, styles?: Partial<SVGStyle>) => {
-  Object.entries(styles ?? {}).forEach(([key, value]) => {
-    const attribute = mapStyleWithAttribute[key as keyof SVGStyle];
-    svg.setAttribute(attribute, String(value));
-  });
-
-  return svg;
-};
-
 const drawPolygon = (svg: SVGElement, ...coords: Shape) => {
   if (coords.length < 3) {
     throw new Error('A shape must have at least 3 points');
@@ -72,40 +35,43 @@ const drawLine = (svg: SVGElement, [[x1, y1], [x2, y2]]: Line) => {
 
 const drawGrid = (svg: SVGElement) => {
   const grid = document.createElementNS('http://www.w3.org/2000/svg', 'g') as SVGGElement;
+  grid.classList.add('grid');
+  const style = document.createElement('style');
 
-  const strokeStyle: Partial<SVGStyle> = {
-    strokeColor: 'lightgray',
-    strokeWidth: 0.015,
-  };
+  style.appendChild(
+    document.createTextNode(`
+      .grid line {
+        stroke: var(--grid);
+        stroke-width: 0.015;
+      }
+
+      .grid text {
+        fill: var(--grid) !important;
+        font-size: 0.01rem !important;
+        transform: translate(-0.01rem, -0.01rem) !important;
+      }
+    `),
+  );
+  grid.appendChild(style);
 
   const linesCount = GRID_SIZE + 1;
 
   for (let i = 0; i < linesCount; i++) {
-    styleSVG(
-      drawLine(grid, [
-        [0, i],
-        [GRID_SIZE, i],
-      ]),
-      strokeStyle,
-    );
-    styleSVG(
-      drawLine(grid, [
-        [i, 0],
-        [i, GRID_SIZE],
-      ]),
-      strokeStyle,
-    );
+    drawLine(grid, [
+      [0, i],
+      [GRID_SIZE, i],
+    ]);
+
+    drawLine(grid, [
+      [i, 0],
+      [i, GRID_SIZE],
+    ]);
   }
 
   for (let i = 0; i < linesCount ** 2; i += 1) {
     const [x, y] = [i % linesCount, Math.floor(i / linesCount)];
 
-    styleSvgText(drawText(grid, [x, y], `${[x, y]}`, Position.bottomRight), {
-      fill: 'lightgray',
-      fontSize: '0.01rem',
-      transform: 'translate(0.05rem, 0.05rem)',
-      userSelect: 'none',
-    });
+    drawText(grid, [x, y], `${[x, y]}`, Position.bottomRight);
   }
 
   svg.appendChild(grid);
@@ -178,70 +144,123 @@ const drawText = (svg: SVGElement, center: Coord, text: string, position = Posit
   return textElement;
 };
 
-const drawLabels = (
-  svg: SVGElement,
-  topSectorPolygon: SVGPolygonElement,
-  rightSectorPolygon: SVGPolygonElement,
-  leftSectorPolygon: SVGPolygonElement,
-) => {
-  drawText(svg, A, `A (${A})`, Position.top);
-  drawText(svg, B, `B (${B})`, Position.right);
-  drawText(svg, C, `C (${C})`, Position.bottomRight);
-  drawText(svg, D, `D (${D})`, Position.bottomLeft);
-  drawText(svg, E, `E (${E})`, Position.left);
+const drawLabels = (svg: SVGElement) => {
+  const labels = document.createElementNS('http://www.w3.org/2000/svg', 'g') as SVGGElement;
+  labels.classList.add('labels');
+  const style = document.createElement('style');
 
-  styleSVG(drawLine(svg, αD), { strokeColor: 'blue', strokeDasharray: '0.1', strokeWidth: 0.06 });
-  styleSvgText(drawText(svg, α, 'α = M(AB)', Position.topRight), { fill: 'blue' });
-  styleSvgText(drawText(svg, getCenterOfLine(αD), 'χ = αD', Position.bottomRight), { fill: 'blue' });
+  style.appendChild(
+    document.createTextNode(`
+      .labels .dottedLine {
+        stroke-dasharray: 0.1;
+        stroke-width: 0.06 !important;
+      }
 
-  styleSVG(drawLine(svg, ψ), { strokeColor: 'green', strokeDasharray: '0.1', strokeWidth: 0.06 });
-  styleSvgText(drawText(svg, β, 'β = ⅓DC', Position.bottom), { fill: 'green' });
-  styleSvgText(drawText(svg, getCenterOfLine(ψ), 'ψ = β - AE', Position.center), { fill: 'green' });
+      .labels text {
+        fill: var(--content);
+      }
 
-  styleSVG(drawLine(svg, ω), { strokeColor: 'red', strokeDasharray: '0.1', strokeWidth: 0.06 });
-  styleSvgText(drawText(svg, γ, 'γ = ⅔DC', Position.bottom), { fill: 'red' });
-  styleSvgText(drawText(svg, χ, 'χ', Position.topLeft), { fill: 'red' });
-  styleSvgText(drawText(svg, getCenterOfLine([Θ, γ]), 'ω = γ - χ', Position.right), { fill: 'red' });
+      .labels .sector {
+        fill: var(--gray);
+      }
 
-  styleSvgText(drawText(svg, Θ, 'Θ = (χ,ψ,ω)', Position.left), {
+      .labels .blue {
+        fill: var(--blue);
+        stroke: var(--blue);
+        stroke-width: 0;
+      }
+
+      .labels .green {
+        fill: var(--green);
+        stroke: var(--green);
+        stroke-width: 0;
+      }
+
+      .labels .red {
+        fill: var(--red);
+        stroke: var(--red);
+        stroke-width: 0;
+      }
+  `),
+  );
+  labels.appendChild(style);
+
+  drawText(labels, A, `A (${A})`, Position.top);
+  drawText(labels, B, `B (${B})`, Position.right);
+  drawText(labels, C, `C (${C})`, Position.bottomRight);
+  drawText(labels, D, `D (${D})`, Position.bottomLeft);
+  drawText(labels, E, `E (${E})`, Position.left);
+
+  drawLine(labels, αD).classList.add('blue', 'dottedLine');
+  drawText(labels, α, 'α = M(AB)', Position.topRight).classList.add('blue');
+  drawText(labels, getCenterOfLine(αD), 'χ = αD', Position.bottomRight).classList.add('blue');
+
+  drawLine(labels, ψ).classList.add('green', 'dottedLine');
+  drawText(labels, β, 'β = ⅓DC', Position.bottom).classList.add('green');
+  drawText(labels, getCenterOfLine(ψ), 'ψ = β - AE', Position.center).classList.add('green');
+
+  drawLine(labels, ω).classList.add('red', 'dottedLine');
+  drawText(labels, γ, 'γ = ⅔DC', Position.bottom).classList.add('red');
+  drawText(labels, χ, 'χ', Position.topLeft).classList.add('red');
+  drawText(labels, getCenterOfLine([Θ, γ]), 'ω = γ - χ', Position.right).classList.add('red');
+
+  styleSvgText(drawText(labels, Θ, 'Θ = (χ,ψ,ω)', Position.left), {
     fill: 'orange',
-    stroke: 'white',
-    strokeWidth: '0.0005rem',
   });
-  styleSvgText(drawText(svg, Θ, `(${Θ[0]},${Θ[1].toFixed(2)})`, Position.right), {
+  styleSvgText(drawText(labels, Θ, `(${Θ[0]},${Θ[1].toFixed(2)})`, Position.right), {
     fill: 'orange',
   });
 
-  styleSVG(topSectorPolygon, { fill: 'lightBlue' });
-  styleSvgText(drawText(svg, getCenterOfLine([A, Θ]), 'Sector Top', Position.center), { fill: 'gray' });
-  styleSvgText(drawText(svg, getCenterOfLine([A, Θ]), 'AαΘχ', Position.bottom), { fill: 'gray' });
+  drawText(labels, getCenterOfLine([A, Θ]), 'Sector Top', Position.center).classList.add('sector');
+  drawText(labels, getCenterOfLine([A, Θ]), 'AαΘχ', Position.bottom).classList.add('sector');
 
-  styleSVG(rightSectorPolygon, { fill: 'lightGreen' });
-  styleSvgText(drawText(svg, getCenterOfLine([α, C]), 'Sector Right', Position.center), { fill: 'gray' });
-  styleSvgText(drawText(svg, getCenterOfLine([α, C]), 'αBCβΘ', Position.bottom), { fill: 'gray' });
+  drawText(labels, getCenterOfLine([α, C]), 'Sector Right', Position.center).classList.add('sector');
+  drawText(labels, getCenterOfLine([α, C]), 'αBCβΘ', Position.bottom).classList.add('sector');
 
-  styleSVG(leftSectorPolygon, { fill: 'lightCoral' });
-  styleSvgText(drawText(svg, getCenterOfLine([E, β]), 'Sector Left', Position.center), { fill: 'gray' });
-  styleSvgText(drawText(svg, getCenterOfLine([E, β]), 'χΘβDE', Position.bottomRight), { fill: 'gray' });
+  styleSvgText(drawText(labels, getCenterOfLine([E, β]), 'Sector Left', Position.center), {
+    transform: 'translate(0.05rem)',
+  }).classList.add('sector');
+  drawText(labels, getCenterOfLine([E, β]), 'χΘβDE', Position.bottomRight).classList.add('sector');
+
+  svg.appendChild(labels);
+
+  return labels;
 };
 
 export function drawSVG() {
   const svg = document.getElementById('svg') as SVGSVGElement | null;
+  const showGridInput = document.getElementById('showGrid') as HTMLInputElement | null;
+  const showLabelsInput = document.getElementById('showLabels') as HTMLInputElement | null;
 
   if (svg) {
     svg.setAttribute('viewBox', `0 0 ${GRID_SIZE} ${GRID_SIZE}`);
+    const style = document.createElement('style');
 
-    const strokeStyle: Partial<SVGStyle> = {
-      fill: 'none',
-      strokeColor: 'black',
-      strokeWidth: 0.33,
-    };
+    style.appendChild(
+      document.createTextNode(`
+        .sectorShape {
+          stroke: var(--content);
+          fill: none;
+          stroke-width: 0.33;
+        }
+      `),
+    );
+    svg.appendChild(style);
 
-    const topSectorPolygon = styleSVG(drawPolygon(svg, ...topSector), strokeStyle);
-    const leftSectorPolygon = styleSVG(drawPolygon(svg, ...leftSector), strokeStyle);
-    const rightSectorPolygon = styleSVG(drawPolygon(svg, ...rightSector), strokeStyle);
+    drawPolygon(svg, ...topSector).classList.add('sectorShape');
+    drawPolygon(svg, ...leftSector).classList.add('sectorShape');
+    drawPolygon(svg, ...rightSector).classList.add('sectorShape');
 
-    drawGrid(svg);
-    drawLabels(svg, topSectorPolygon, rightSectorPolygon, leftSectorPolygon);
+    const grid = drawGrid(svg);
+    showGridInput?.addEventListener('change', (event) => {
+      const target = event.target as HTMLInputElement;
+      grid.style.display = target.checked ? 'block' : 'none';
+    });
+
+    const labels = drawLabels(svg);
+    showLabelsInput?.addEventListener('change', (event) => {
+      const target = event.target as HTMLInputElement;
+      labels.style.display = target.checked ? 'block' : 'none';
+    });
   }
 }
